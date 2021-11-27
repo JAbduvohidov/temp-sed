@@ -201,6 +201,19 @@ func login(c *gin.Context) {
 		return
 	}
 
+	_, err = pool.Exec(
+		context.Background(),
+		`update employees set token = $1 where email = $2;`,
+		token,
+		employee.Email,
+	)
+	if err != nil {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
 	response.Payload = token
 
 	c.JSON(http.StatusOK, &response)
