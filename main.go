@@ -119,17 +119,17 @@ func main() {
 
 	r.POST("/login", login)
 
-	r.GET("/letters", getDocuments)
+	r.GET("/letters", authorization, getDocuments)
 
-	r.GET("/letter/{id}", getDocument)
+	r.GET("/letter/{id}", authorization, getDocument)
 
-	r.POST("/letter", createDocument)
+	r.POST("/letter", authorization, createDocument)
 
-	r.GET("/letters/type", getLetterTypes)
+	r.GET("/letters/type", authorization, getLetterTypes)
 
-	r.GET("/users", getUsers)
+	r.GET("/users", authorization, getUsers)
 
-	r.GET("/users/me", getProfile)
+	r.GET("/users/me", authorization, getProfile)
 
 	log.Fatalln(r.Run())
 }
@@ -524,8 +524,7 @@ func getProfile(c *gin.Context) {
 		}
 	)
 
-	header := c.GetHeader("Authorization")
-	token := strings.Split(header, " ")[1]
+	userId := c.GetString("user-id")
 
 	err := pool.QueryRow(
 		c,
@@ -537,8 +536,8 @@ func getProfile(c *gin.Context) {
 from employees e
          left join role_group rg on e.role_id = rg.id
          left join departments d on e.department_id = d.id
-where e.token = $1;`,
-		token,
+where e.id = $1;`,
+		userId,
 	).Scan()
 	if err != nil {
 		response.Code = http.StatusInternalServerError
@@ -550,4 +549,60 @@ where e.token = $1;`,
 	response.Payload = employee
 
 	c.JSON(http.StatusOK, &response)
+}
+
+func authorization(c *gin.Context) {
+	response := Response{
+		Code:    http.StatusUnauthorized,
+		Message: http.StatusText(http.StatusUnauthorized),
+		Time:    time.Now(),
+	}
+
+	header := c.GetHeader("Authorization")
+
+	parts := strings.Split(header, "")
+
+	if len(parts) != 2 {
+		response.Message = "invalid authorization header"
+		c.AbortWithStatusJSON(http.StatusOK, response)
+		return
+	}
+
+	authorizationType, token := parts[0], parts[1]
+
+	if authorizationType != "Bearer" {
+		response.Message = "invalid authorization type"
+		c.AbortWithStatusJSON(http.StatusOK, response)
+		return
+	}
+
+	if len(token) < 30 {
+		response.Message = "invalid token"
+		c.AbortWithStatusJSON(http.StatusOK, response)
+		return
+	}
+
+	id := 0
+	err := pool.QueryRow(
+		c,
+		`select id
+from employees
+where token = $1;`,
+		token,
+	).Scan(&id)
+	if err != nil {
+		response.Message = err.Error()
+		c.AbortWithStatusJSON(http.StatusOK, response)
+		return
+	}
+
+	if id == 0 {
+		response.Message = "user not found or invalid token"
+		c.AbortWithStatusJSON(http.StatusOK, response)
+		return
+	}
+
+	c.Set("user-id", id)
+
+	c.Next()
 }
