@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -44,6 +45,14 @@ type Employee struct {
 	Token        string     `json:"token,omitempty"`
 	DepartmentId int        `json:"department_id,omitempty"`
 	Department   Department `json:"department,omitempty"`
+}
+
+type EmployeeFilter struct {
+	FullName   string `json:"full_name" validate:"min=3"`
+	Email      string `json:"email" validate:"email"`
+	Department string `json:"department" validate:"min=1"`
+	RowsLimit  uint   `json:"rows_limit" validate:"required,number,min=1"`
+	RowsOffset uint   `json:"rows_offset" validate:"number,min=0"`
 }
 
 type Letter struct {
@@ -117,6 +126,10 @@ func main() {
 	r.POST("/letter", createDocument)
 
 	r.GET("/letters/type", getLetterTypes)
+
+	r.GET("/users", getUsers)
+
+	r.GET("/users/me", getProfile)
 
 	log.Fatalln(r.Run())
 }
@@ -416,6 +429,125 @@ from document_type;`,
 	}
 
 	response.Payload = documentTypes
+
+	c.JSON(http.StatusOK, &response)
+}
+
+func getUsers(c *gin.Context) {
+	var (
+		employees      []Employee
+		employeeFilter = EmployeeFilter{}
+		response       = Response{
+			Code:    http.StatusOK,
+			Message: http.StatusText(http.StatusOK),
+			Time:    time.Now(),
+		}
+	)
+
+	data, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		log.Println("unable to read body data:", err)
+		response.Code = http.StatusInternalServerError
+		response.Message = http.StatusText(http.StatusInternalServerError)
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	err = json.Unmarshal(data, &employeeFilter)
+	if err != nil {
+		log.Println("error unmarshaling employee:", err)
+		response.Code = http.StatusInternalServerError
+		response.Message = http.StatusText(http.StatusInternalServerError)
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	err = validate.Struct(employeeFilter)
+	if err != nil {
+		response.Code = http.StatusBadRequest
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	//TODO: add filters
+	rows, err := pool.Query(
+		c,
+		`select e.id, e.full_name, rg.role, e.email, d.name
+	from employees e
+	left join role_group rg on e.role_id = rg.id
+	left join departments d on e.department_id = d.id
+	order by e.id desc
+	offset $1 limit $2; `,
+		employeeFilter.RowsOffset,
+		employeeFilter.RowsLimit,
+	)
+	if err != nil {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	for rows.Next() {
+		employee := Employee{}
+		err = rows.Scan(
+			&employee.Id,
+			&employee.FullName,
+			&employee.Role,
+			&employee.Email,
+			&employee.Department,
+		)
+
+		if err != nil {
+			response.Code = http.StatusInternalServerError
+			response.Message = err.Error()
+			c.JSON(http.StatusOK, &response)
+			return
+		}
+
+		employees = append(employees, employee)
+	}
+
+	response.Payload = employees
+
+	c.JSON(http.StatusOK, &response)
+}
+
+func getProfile(c *gin.Context) {
+	var (
+		employee = Employee{}
+		response = Response{
+			Code:    http.StatusOK,
+			Message: http.StatusText(http.StatusOK),
+			Time:    time.Now(),
+		}
+	)
+
+	header := c.GetHeader("Authorization")
+	token := strings.Split(header, " ")[1]
+
+	err := pool.QueryRow(
+		c,
+		`select e.id,
+       e.full_name,
+       rg.role,
+       e.email,
+       d.name
+from employees e
+         left join role_group rg on e.role_id = rg.id
+         left join departments d on e.department_id = d.id
+where e.token = $1;`,
+		token,
+	).Scan()
+	if err != nil {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	response.Payload = employee
 
 	c.JSON(http.StatusOK, &response)
 }
