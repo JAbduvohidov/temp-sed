@@ -247,7 +247,7 @@ func getDocuments(c *gin.Context) {
        l.entry_date,
        l.outgoing_number,
        l.distribution_date
-from documentLetters l
+from document_letters l
          left join document_type dt on l.document_type_id = dt.id;`,
 	)
 	if err != nil {
