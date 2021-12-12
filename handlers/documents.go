@@ -14,6 +14,7 @@ import (
 func GetDocuments(c *gin.Context) {
 	var (
 		documentLetters []models.Letter
+		documentFilter  models.LetterFilter
 		response        = models.Response{
 			Code:    http.StatusOK,
 			Message: http.StatusText(http.StatusOK),
@@ -21,6 +22,33 @@ func GetDocuments(c *gin.Context) {
 		}
 	)
 
+	data, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		log.Println("unable to read body data:", err)
+		response.Code = http.StatusInternalServerError
+		response.Message = http.StatusText(http.StatusInternalServerError)
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	err = json.Unmarshal(data, &documentFilter)
+	if err != nil {
+		log.Println("error unmarshaling employee:", err)
+		response.Code = http.StatusInternalServerError
+		response.Message = http.StatusText(http.StatusInternalServerError)
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	err = Validate.Struct(documentFilter)
+	if err != nil {
+		response.Code = http.StatusBadRequest
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	//TODO: add filters
 	rows, err := db.Pool.Query(
 		c,
 		`select l.id,
@@ -32,7 +60,9 @@ func GetDocuments(c *gin.Context) {
        l.outgoing_number,
        l.distribution_date
 from document_letters l
-         left join document_type dt on l.document_type_id = dt.id;`,
+         left join document_type dt on l.document_type_id = dt.id
+order by l.id desc
+offset $1 limit $2;`,
 	)
 	if err != nil {
 		response.Code = http.StatusInternalServerError
