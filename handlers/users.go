@@ -289,3 +289,47 @@ where e.id = $1;`,
 
 	c.JSON(http.StatusOK, &response)
 }
+
+func GetRoles(c *gin.Context) {
+	var (
+		roleGroups []models.RoleGroup
+		response   = models.Response{
+			Code:    http.StatusOK,
+			Message: http.StatusText(http.StatusOK),
+			Time:    time.Now(),
+		}
+	)
+
+	rows, err := db.Pool.Query(
+		c,
+		`select id, role
+from role_group;`,
+	)
+	if err != nil {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	for rows.Next() {
+		roleGroup := models.RoleGroup{}
+		err = rows.Scan(
+			&roleGroup.Id,
+			&roleGroup.Role,
+		)
+
+		if err != nil {
+			response.Code = http.StatusInternalServerError
+			response.Message = err.Error()
+			c.JSON(http.StatusOK, &response)
+			return
+		}
+
+		roleGroups = append(roleGroups, roleGroup)
+	}
+
+	response.Payload = roleGroups
+
+	c.JSON(http.StatusOK, &response)
+}
