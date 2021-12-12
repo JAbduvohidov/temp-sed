@@ -27,6 +27,8 @@ func main() {
 
 	r.POST("/letter", handlers.Authorization, handlers.CreateDocument)
 
+	r.PUT("/letter", handlers.Authorization, handlers.EditDocument)
+
 	r.GET("/letters/type", handlers.Authorization, handlers.GetLetterTypes)
 
 	r.GET("/users", handlers.Authorization, handlers.GetUsers)
