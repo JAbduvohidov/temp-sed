@@ -52,6 +52,16 @@ type Letter struct {
 	Content            string       `json:"content,omitempty" validate:"required,min=20"`
 }
 
+type LetterFilter struct {
+	Name               string `json:"name" validate:"min=1"`
+	Sender             string `json:"sender" validate:"min=1"`
+	DepartmentTypeId   int    `json:"department_type_id" validate:"number,min=1"`
+	RegistrationNumber string `json:"registration_number" validate:"min=1"`
+	OutgoingNumber     string `json:"outgoing_number" validate:"min=1"`
+	RowsLimit          uint   `json:"rows_limit" validate:"required,number,min=1"`
+	RowsOffset         uint   `json:"rows_offset" validate:"number,min=0"`
+}
+
 type DescribedLetter struct {
 	Id                int        `json:"id,omitempty"`
 	LetterId          int        `json:"letter_id,omitempty"`
