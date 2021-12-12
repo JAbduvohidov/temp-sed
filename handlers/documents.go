@@ -167,6 +167,78 @@ values ($1, $2, $3, now(), now(), now(), $4);`,
 	c.JSON(http.StatusOK, &response)
 }
 
+func EditDocument(c *gin.Context) {
+	var (
+		documentLetter models.Letter
+		response       = models.Response{
+			Code:    http.StatusOK,
+			Message: http.StatusText(http.StatusOK),
+			Time:    time.Now(),
+		}
+	)
+
+	data, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		log.Println("unable to read body data:", err)
+		response.Code = http.StatusInternalServerError
+		response.Message = http.StatusText(http.StatusInternalServerError)
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	err = json.Unmarshal(data, &documentLetter)
+	if err != nil {
+		log.Println("error unmarshaling employee:", err)
+		response.Code = http.StatusInternalServerError
+		response.Message = http.StatusText(http.StatusInternalServerError)
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	err = Validate.Struct(documentLetter)
+	if err != nil {
+		response.Code = http.StatusBadRequest
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	if documentLetter.Id == 0 {
+		response.Code = http.StatusBadRequest
+		response.Message = "invalid document id"
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	rtn, err := db.Pool.Exec(
+		c,
+		`update letters
+set name                = $1,
+    sender              = $2,
+    document_type_id    = $3,
+    registration_number = $4,
+    entry_date          = $5,
+    outgoing_number     = $6,
+    content             = $7
+where id = $8;`,
+	)
+	if err != nil {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	if rtn.RowsAffected() < 1 {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	c.JSON(http.StatusOK, &response)
+}
+
 func GetLetterTypes(c *gin.Context) {
 	var (
 		documentTypes []models.DocumentType

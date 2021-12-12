@@ -40,7 +40,7 @@ type EmployeeFilter struct {
 }
 
 type Letter struct {
-	Id                 int          `json:"id,omitempty"`
+	Id                 int          `json:"id,omitempty" validate:"min=1"`
 	Name               string       `json:"name,omitempty" validate:"required,min=2"`
 	Sender             string       `json:"sender,omitempty" validate:"required,min=2"`
 	DocumentTypeId     int          `json:"document_type_id,omitempty" validate:"required,number"`
