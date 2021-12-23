@@ -40,7 +40,7 @@ type EmployeeFilter struct {
 }
 
 type Letter struct {
-	Id                 int          `json:"id,omitempty" validate:"min=1"`
+	Id                 int          `json:"id,omitempty"`
 	Name               string       `json:"name,omitempty" validate:"required,min=2"`
 	Sender             string       `json:"sender,omitempty" validate:"required,min=2"`
 	DocumentTypeId     int          `json:"document_type_id,omitempty" validate:"required,number"`
@@ -53,13 +53,13 @@ type Letter struct {
 }
 
 type LetterFilter struct {
-	Name               string `json:"name" validate:"min=1"`
-	Sender             string `json:"sender" validate:"min=1"`
-	DepartmentTypeId   int    `json:"department_type_id" validate:"number,min=1"`
-	RegistrationNumber string `json:"registration_number" validate:"min=1"`
-	OutgoingNumber     string `json:"outgoing_number" validate:"min=1"`
+	Name               string `json:"name"`
+	Sender             string `json:"sender"`
+	DepartmentTypeId   int    `json:"department_type_id"`
+	RegistrationNumber string `json:"registration_number"`
+	OutgoingNumber     string `json:"outgoing_number"`
 	RowsLimit          uint   `json:"rows_limit" validate:"required,number,min=1"`
-	RowsOffset         uint   `json:"rows_offset" validate:"number,min=0"`
+	RowsOffset         uint   `json:"rows_offset"`
 }
 
 type DescribedLetter struct {

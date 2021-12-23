@@ -29,7 +29,7 @@ func Authorization(c *gin.Context) {
 
 	header := c.GetHeader("Authorization")
 
-	parts := strings.Split(header, "")
+	parts := strings.Split(header, " ")
 
 	if len(parts) != 2 {
 		response.Message = "invalid authorization header"
@@ -114,13 +114,18 @@ func Login(c *gin.Context) {
 
 	id := 0
 	passwordHash := ""
+	role := ""
 	err = db.Pool.QueryRow(
 		context.Background(),
-		`select id, password from employees where email = $1`,
+		`select e.id, e.password, rg.role
+from employees e
+         left join role_group rg on e.role_id = rg.id
+where email = $1;`,
 		employee.Email,
 	).Scan(
 		&id,
 		&passwordHash,
+		&role,
 	)
 	if err != nil {
 		if errors.Is(pgx.ErrNoRows, err) {
@@ -167,7 +172,13 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	response.Payload = token
+	response.Payload = struct {
+		Token string `json:"token"`
+		Role  string `json:"role"`
+	}{
+		Token: token,
+		Role:  role,
+	}
 
 	c.JSON(http.StatusOK, &response)
 }
@@ -249,6 +260,72 @@ func GetUsers(c *gin.Context) {
 	}
 
 	response.Payload = employees
+
+	c.JSON(http.StatusOK, &response)
+}
+
+func EditUser(c *gin.Context) {
+	var (
+		employee models.Employee
+		response = models.Response{
+			Code:    http.StatusOK,
+			Message: http.StatusText(http.StatusOK),
+			Time:    time.Now(),
+		}
+	)
+
+	userId := c.GetString("user-id")
+
+	data, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		log.Println("unable to read body data:", err)
+		response.Code = http.StatusInternalServerError
+		response.Message = http.StatusText(http.StatusInternalServerError)
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+	err = json.Unmarshal(data, &employee)
+	if err != nil {
+		log.Println("error unmarshaling employee:", err)
+		response.Code = http.StatusInternalServerError
+		response.Message = http.StatusText(http.StatusInternalServerError)
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	err = Validate.Struct(employee)
+	if err != nil {
+		response.Code = http.StatusBadRequest
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	rtn, err := db.Pool.Exec(
+		c,
+		`update employees
+set full_name     = $1,
+    role_id       = $2,
+    department_id = $3
+where id = $4;`,
+		employee.FullName,
+		employee.RoleId,
+		employee.DepartmentId,
+		userId,
+	)
+	if err != nil {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	if rtn.RowsAffected() < 1 {
+		response.Code = http.StatusBadRequest
+		response.Message = pgx.ErrNoRows.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
 
 	c.JSON(http.StatusOK, &response)
 }

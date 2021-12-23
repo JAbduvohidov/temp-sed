@@ -23,19 +23,37 @@ func main() {
 
 	r.GET("/letters", handlers.Authorization, handlers.GetDocuments)
 
-	r.GET("/letter/{id}", handlers.Authorization, handlers.GetDocument)
+	r.GET("/letter/:id", handlers.Authorization, handlers.GetDocument)
 
 	r.POST("/letter", handlers.Authorization, handlers.CreateDocument)
 
 	r.PUT("/letter", handlers.Authorization, handlers.EditDocument)
 
-	r.GET("/letters/type", handlers.Authorization, handlers.GetLetterTypes)
+	r.GET("/letters/types", handlers.Authorization, handlers.GetLetterTypes)
 
 	r.GET("/users", handlers.Authorization, handlers.GetUsers)
 
-	r.GET("/users/me", handlers.Authorization, handlers.GetProfile)
+	r.PUT("/users/:id", handlers.Authorization, handlers.EditUser)
+
+	r.GET("/users/:id", handlers.Authorization, handlers.GetProfile)
 
 	r.GET("/roles", handlers.Authorization, handlers.GetRoles)
+
+	r.GET("/departments", handlers.Authorization, handlers.GetDepartments)
+
+	r.POST("/department", handlers.Authorization, handlers.CreateDepartment)
+
+	r.PUT("/department", handlers.Authorization, handlers.EditDepartment)
+
+	//r.GET("/departments/:id/users", handlers.Authorization, handlers.GetDepartmentEmployees)
+	//
+	//r.POST("/letters/describe", handlers.Authorization, handlers.DescribeLetter)
+	//
+	//r.GET("/letters/agreements", handlers.Authorization, handlers.GetAgreements)
+	//
+	//r.POST("/letters/agreement", handlers.Authorization, handlers.CreateAgreement)
+	//
+	//r.GET("/letters/agreements{id}", handlers.Authorization, handlers.GetAgreement)
 
 	log.Fatalln(r.Run())
 }

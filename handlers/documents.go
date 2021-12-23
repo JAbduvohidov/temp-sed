@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v4"
 	"io"
 	"log"
 	"net/http"
@@ -59,10 +61,12 @@ func GetDocuments(c *gin.Context) {
        l.entry_date,
        l.outgoing_number,
        l.distribution_date
-from document_letters l
+from letters l
          left join document_type dt on l.document_type_id = dt.id
 order by l.id desc
 offset $1 limit $2;`,
+		documentFilter.RowsOffset,
+		documentFilter.RowsLimit,
 	)
 	if err != nil {
 		response.Code = http.StatusInternalServerError
@@ -102,6 +106,8 @@ func GetDocument(c *gin.Context) {
 		}
 	)
 
+	id := c.Param("id")
+
 	err := db.Pool.QueryRow(
 		c,
 		`select l.id,
@@ -111,16 +117,17 @@ func GetDocument(c *gin.Context) {
        l.registration_number,
        l.entry_date,
        l.outgoing_number,
-       l.distribution_date,
+       coalesce(l.distribution_date, now()),
        l.content
 from letters l
          left join document_type dt on l.document_type_id = dt.id
 where l.id = $1;`,
+		id,
 	).Scan(
 		&documentLetter.Id,
 		&documentLetter.Name,
 		&documentLetter.Sender,
-		&documentLetter.DocumentType,
+		&documentLetter.DocumentType.Type,
 		&documentLetter.RegistrationNumber,
 		&documentLetter.EntryDate,
 		&documentLetter.OutgoingNumber,
@@ -128,6 +135,11 @@ where l.id = $1;`,
 		&documentLetter.Content,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusOK, &response)
+			return
+		}
+
 		response.Code = http.StatusInternalServerError
 		response.Message = err.Error()
 		c.JSON(http.StatusOK, &response)
@@ -179,6 +191,10 @@ func CreateDocument(c *gin.Context) {
 		c,
 		`insert into letters (name, sender, document_type_id, registration_number, entry_date, outgoing_number, content)
 values ($1, $2, $3, now(), now(), now(), $4);`,
+		documentLetter.Name,
+		documentLetter.Sender,
+		documentLetter.DocumentTypeId,
+		documentLetter.Content,
 	)
 	if err != nil {
 		response.Code = http.StatusInternalServerError
@@ -246,11 +262,13 @@ func EditDocument(c *gin.Context) {
 set name                = $1,
     sender              = $2,
     document_type_id    = $3,
-    registration_number = $4,
-    entry_date          = $5,
-    outgoing_number     = $6,
-    content             = $7
-where id = $8;`,
+    content             = $4
+where id = $5;`,
+		documentLetter.Name,
+		documentLetter.Sender,
+		documentLetter.DocumentTypeId,
+		documentLetter.Content,
+		documentLetter.Id,
 	)
 	if err != nil {
 		response.Code = http.StatusInternalServerError
