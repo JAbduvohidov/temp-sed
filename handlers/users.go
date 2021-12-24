@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"sed/db"
 	"sed/models"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -220,7 +221,6 @@ func GetUsers(c *gin.Context) {
 		return
 	}
 
-	//TODO: add filters
 	rows, err := db.Pool.Query(
 		c,
 		`select e.id, e.full_name, rg.role, e.email, d.name
@@ -244,9 +244,9 @@ func GetUsers(c *gin.Context) {
 		err = rows.Scan(
 			&employee.Id,
 			&employee.FullName,
-			&employee.Role,
+			&employee.Role.Role,
 			&employee.Email,
-			&employee.Department,
+			&employee.Department.Name,
 		)
 
 		if err != nil {
@@ -266,15 +266,16 @@ func GetUsers(c *gin.Context) {
 
 func EditUser(c *gin.Context) {
 	var (
-		employee models.Employee
-		response = models.Response{
+		externalEmployee models.Employee
+		internalEmployee models.Employee
+		response         = models.Response{
 			Code:    http.StatusOK,
 			Message: http.StatusText(http.StatusOK),
 			Time:    time.Now(),
 		}
 	)
 
-	userId := c.GetString("user-id")
+	userId := c.GetInt("user-id")
 
 	data, err := io.ReadAll(c.Request.Body)
 	if err != nil {
@@ -284,19 +285,52 @@ func EditUser(c *gin.Context) {
 		c.JSON(http.StatusOK, &response)
 		return
 	}
-	err = json.Unmarshal(data, &employee)
+	err = json.Unmarshal(data, &externalEmployee)
 	if err != nil {
-		log.Println("error unmarshaling employee:", err)
+		log.Println("error unmarshaling externalEmployee:", err)
 		response.Code = http.StatusInternalServerError
 		response.Message = http.StatusText(http.StatusInternalServerError)
 		c.JSON(http.StatusOK, &response)
 		return
 	}
 
-	err = Validate.Struct(employee)
+	err = Validate.Struct(externalEmployee)
 	if err != nil {
 		response.Code = http.StatusBadRequest
 		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	err = db.Pool.QueryRow(
+		c,
+		`select e.id,
+       e.full_name,
+       rg.role,
+       e.email,
+       d.name
+from employees e
+         left join role_group rg on e.role_id = rg.id
+         left join departments d on e.department_id = d.id
+where e.id = $1;`,
+		userId,
+	).Scan(
+		&internalEmployee.Id,
+		&internalEmployee.FullName,
+		&internalEmployee.Role.Role,
+		&internalEmployee.Email,
+		&internalEmployee.Department.Name,
+	)
+	if err != nil {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	if internalEmployee.Role.Role != "ADMIN" {
+		response.Code = http.StatusBadRequest
+		response.Message = "no access to this page"
 		c.JSON(http.StatusOK, &response)
 		return
 	}
@@ -308,9 +342,9 @@ set full_name     = $1,
     role_id       = $2,
     department_id = $3
 where id = $4;`,
-		employee.FullName,
-		employee.RoleId,
-		employee.DepartmentId,
+		externalEmployee.FullName,
+		externalEmployee.RoleId,
+		externalEmployee.DepartmentId,
 		userId,
 	)
 	if err != nil {
@@ -340,8 +374,7 @@ func GetProfile(c *gin.Context) {
 		}
 	)
 
-	userId := c.GetString("user-id")
-
+	userId := c.GetInt("user-id")
 	err := db.Pool.QueryRow(
 		c,
 		`select e.id,
@@ -354,7 +387,54 @@ from employees e
          left join departments d on e.department_id = d.id
 where e.id = $1;`,
 		userId,
-	).Scan()
+	).Scan(
+		&employee.Id,
+		&employee.FullName,
+		&employee.Role.Role,
+		&employee.Email,
+		&employee.Department.Name,
+	)
+	if err != nil {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	paramUserId, _ := strconv.Atoi(c.Param("id"))
+
+	if employee.Id == paramUserId {
+		response.Payload = employee
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	if employee.Role.Role != "ADMIN" {
+		response.Code = http.StatusBadRequest
+		response.Message = "no access to this page"
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	err = db.Pool.QueryRow(
+		c,
+		`select e.id,
+       e.full_name,
+       rg.role,
+       e.email,
+       d.name
+from employees e
+         left join role_group rg on e.role_id = rg.id
+         left join departments d on e.department_id = d.id
+where e.id = $1;`,
+		paramUserId,
+	).Scan(
+		&employee.Id,
+		&employee.FullName,
+		&employee.Role.Role,
+		&employee.Email,
+		&employee.Department.Name,
+	)
 	if err != nil {
 		response.Code = http.StatusInternalServerError
 		response.Message = err.Error()

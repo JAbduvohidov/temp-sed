@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v4"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"sed/db"
 	"sed/models"
+	"strings"
 	"time"
 )
 
@@ -50,7 +52,6 @@ func GetDocuments(c *gin.Context) {
 		return
 	}
 
-	//TODO: add filters
 	rows, err := db.Pool.Query(
 		c,
 		`select l.id,
@@ -63,6 +64,8 @@ func GetDocuments(c *gin.Context) {
        l.distribution_date
 from letters l
          left join document_type dt on l.document_type_id = dt.id
+where true 
+`+documentFilters(documentFilter)+`
 order by l.id desc
 offset $1 limit $2;`,
 		documentFilter.RowsOffset,
@@ -94,6 +97,21 @@ offset $1 limit $2;`,
 	response.Payload = documentLetters
 
 	c.JSON(http.StatusOK, &response)
+}
+
+func documentFilters(filter models.LetterFilter) (query string) {
+
+	filter.Sender = strings.TrimSpace(filter.Sender)
+	if len(filter.Sender) > 0 {
+		query += fmt.Sprintf(" and l.sender like '%%%s%%' ", filter.Sender)
+	}
+
+	filter.Name = strings.TrimSpace(filter.Name)
+	if len(filter.Name) > 0 {
+		query += fmt.Sprintf(" and l.name like '%%%s%%' ", filter.Name)
+	}
+
+	return
 }
 
 func GetDocument(c *gin.Context) {
@@ -320,6 +338,59 @@ from document_type;`,
 	}
 
 	response.Payload = documentTypes
+
+	c.JSON(http.StatusOK, &response)
+}
+
+func DescribeLetter(c *gin.Context) {
+	var (
+		describedLetter models.DescribedLetter
+		response        = models.Response{
+			Code:    http.StatusOK,
+			Message: http.StatusText(http.StatusOK),
+			Time:    time.Now(),
+		}
+	)
+
+	data, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		log.Println("unable to read body data:", err)
+		response.Code = http.StatusInternalServerError
+		response.Message = http.StatusText(http.StatusInternalServerError)
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	err = json.Unmarshal(data, &describedLetter)
+	if err != nil {
+		log.Println("error unmarshaling employee:", err)
+		response.Code = http.StatusInternalServerError
+		response.Message = http.StatusText(http.StatusInternalServerError)
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	rtn, err := db.Pool.Exec(
+		c,
+		`insert into described_letters (letter_id, department_id, executive_employee)
+values ($1, $2, $3);`,
+		describedLetter.LetterId,
+		describedLetter.DepartmentId,
+		describedLetter.ExecutiveEmployee,
+	)
+	if err != nil {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	if rtn.RowsAffected() < 1 {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
 
 	c.JSON(http.StatusOK, &response)
 }

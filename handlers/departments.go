@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sed/db"
 	"sed/models"
+	"strconv"
 	"time"
 )
 
@@ -167,43 +168,59 @@ where id = $4;`,
 	c.JSON(http.StatusOK, &response)
 }
 
-//func GetDepartmentEmployees(c *gin.Context) {
-//	var (
-//		employees []models.Employee
-//		response  = models.Response{
-//			Code:    http.StatusOK,
-//			Message: http.StatusText(http.StatusOK),
-//			Time:    time.Now(),
-//		}
-//	)
-//
-//	id := c.Param("id")
-//
-//	rtn, err := db.Pool.Exec(
-//		c,
-//		`update departments
-//set name            = $1,
-//    internal_number = $2,
-//    phone           = $3
-//where id = $4;`,
-//		department.Name,
-//		department.InternalNumber,
-//		department.Phone,
-//		department.Id,
-//	)
-//	if err != nil {
-//		response.Code = http.StatusInternalServerError
-//		response.Message = err.Error()
-//		c.JSON(http.StatusOK, &response)
-//		return
-//	}
-//
-//	if rtn.RowsAffected() < 1 {
-//		response.Code = http.StatusBadRequest
-//		response.Message = pgx.ErrNoRows.Error()
-//		c.JSON(http.StatusOK, &response)
-//		return
-//	}
-//
-//	c.JSON(http.StatusOK, &response)
-//}
+func GetDepartmentEmployees(c *gin.Context) {
+	var (
+		employees []models.Employee
+		response  = models.Response{
+			Code:    http.StatusOK,
+			Message: http.StatusText(http.StatusOK),
+			Time:    time.Now(),
+		}
+	)
+
+	id, _ := strconv.Atoi(c.Param("id"))
+
+	rows, err := db.Pool.Query(
+		c,
+		`select e.id,
+       e.full_name,
+       rg.role,
+       e.email,
+       d.name
+from employees e
+         left join role_group rg on e.role_id = rg.id
+         left join departments d on e.department_id = d.id
+where d.id = $1;`,
+		id,
+	)
+	if err != nil {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	for rows.Next() {
+		employee := models.Employee{}
+
+		err = rows.Scan(
+			&employee.Id,
+			&employee.FullName,
+			&employee.Role.Role,
+			&employee.Email,
+			&employee.Department.Name,
+		)
+		if err != nil {
+			response.Code = http.StatusInternalServerError
+			response.Message = err.Error()
+			c.JSON(http.StatusOK, &response)
+			return
+		}
+
+		employees = append(employees, employee)
+	}
+
+	response.Payload = employees
+
+	c.JSON(http.StatusOK, &response)
+}

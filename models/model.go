@@ -24,17 +24,17 @@ type Employee struct {
 	FullName     string     `json:"full_name,omitempty"`
 	RoleId       int        `json:"role_id,omitempty"`
 	Role         RoleGroup  `json:"role,omitempty"`
-	Email        string     `json:"email,omitempty" validate:"required,email"`
-	Password     string     `json:"password,omitempty" validate:"required,min=8"`
+	Email        string     `json:"email,omitempty"`
+	Password     string     `json:"password,omitempty"`
 	Token        string     `json:"token,omitempty"`
 	DepartmentId int        `json:"department_id,omitempty"`
 	Department   Department `json:"department,omitempty"`
 }
 
 type EmployeeFilter struct {
-	FullName   string `json:"full_name" validate:"min=3"`
-	Email      string `json:"email" validate:"email"`
-	Department string `json:"department" validate:"min=1"`
+	FullName   string `json:"full_name"`
+	Email      string `json:"email"`
+	Department string `json:"department"`
 	RowsLimit  uint   `json:"rows_limit" validate:"required,number,min=1"`
 	RowsOffset uint   `json:"rows_offset" validate:"number,min=0"`
 }
@@ -55,9 +55,6 @@ type Letter struct {
 type LetterFilter struct {
 	Name               string `json:"name"`
 	Sender             string `json:"sender"`
-	DepartmentTypeId   int    `json:"department_type_id"`
-	RegistrationNumber string `json:"registration_number"`
-	OutgoingNumber     string `json:"outgoing_number"`
 	RowsLimit          uint   `json:"rows_limit" validate:"required,number,min=1"`
 	RowsOffset         uint   `json:"rows_offset"`
 }
