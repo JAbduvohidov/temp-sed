@@ -59,9 +59,9 @@ func GetDocuments(c *gin.Context) {
        l.sender,
        dt.type,
        l.registration_number,
-       l.entry_date,
-       l.outgoing_number,
-       l.distribution_date
+       coalesce(l.entry_date, now()),
+       coalesce(l.outgoing_number, ''),
+       coalesce(l.distribution_date, now())
 from letters l
          left join document_type dt on l.document_type_id = dt.id
 where true 
@@ -84,12 +84,18 @@ offset $1 limit $2;`,
 			&letter.Id,
 			&letter.Name,
 			&letter.Sender,
-			&letter.DocumentType,
+			&letter.DocumentType.Type,
 			&letter.RegistrationNumber,
 			&letter.EntryDate,
 			&letter.OutgoingNumber,
 			&letter.DistributionDate,
 		)
+		if err != nil {
+			response.Code = http.StatusInternalServerError
+			response.Message = err.Error()
+			c.JSON(http.StatusOK, &response)
+			return
+		}
 
 		documentLetters = append(documentLetters, letter)
 	}
