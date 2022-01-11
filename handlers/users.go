@@ -116,9 +116,11 @@ func Login(c *gin.Context) {
 	id := 0
 	passwordHash := ""
 	role := ""
+	name := ""
+	email := ""
 	err = db.Pool.QueryRow(
 		context.Background(),
-		`select e.id, e.password, rg.role
+		`select e.id, e.password, rg.role, e.full_name, e.email
 from employees e
          left join role_group rg on e.role_id = rg.id
 where email = $1;`,
@@ -127,6 +129,8 @@ where email = $1;`,
 		&id,
 		&passwordHash,
 		&role,
+		&name,
+		&email,
 	)
 	if err != nil {
 		if errors.Is(pgx.ErrNoRows, err) {
@@ -176,9 +180,15 @@ where email = $1;`,
 	response.Payload = struct {
 		Token string `json:"token"`
 		Role  string `json:"role"`
+		Id    int    `json:"id"`
+		Name  string `json:"name"`
+		Email string `json:"email"`
 	}{
 		Token: token,
 		Role:  role,
+		Id:    id,
+		Name:  name,
+		Email: email,
 	}
 
 	c.JSON(http.StatusOK, &response)

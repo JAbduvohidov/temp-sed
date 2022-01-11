@@ -5,9 +5,9 @@ go 1.17
 
 require (
 	github.com/JAbduvohidov/jwt v0.0.0-20200314105802-4a51e9a9d133
+	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.4
 	github.com/go-playground/validator/v10 v10.4.1
-	github.com/google/uuid v1.3.0
 	github.com/jackc/pgx/v4 v4.14.0
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 )

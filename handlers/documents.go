@@ -114,7 +114,7 @@ func documentFilters(filter models.LetterFilter) (query string) {
 
 	filter.Name = strings.TrimSpace(filter.Name)
 	if len(filter.Name) > 0 {
-		query += fmt.Sprintf(" and l.name like '%%%s%%' ", filter.Name)
+		query += fmt.Sprintf(" and lower(l.name) like n'%%%s%%' ", strings.ToLower(filter.Name))
 	}
 
 	return
@@ -211,15 +211,17 @@ func CreateDocument(c *gin.Context) {
 		return
 	}
 
-	rtn, err := db.Pool.Exec(
+	id := 0
+
+	err = db.Pool.QueryRow(
 		c,
 		`insert into letters (name, sender, document_type_id, registration_number, entry_date, outgoing_number, content)
-values ($1, $2, $3, now(), now(), now(), $4);`,
+values ($1, $2, $3, now(), now(), now(), $4) returning id;`,
 		documentLetter.Name,
 		documentLetter.Sender,
 		documentLetter.DocumentTypeId,
 		documentLetter.Content,
-	)
+	).Scan(&id)
 	if err != nil {
 		response.Code = http.StatusInternalServerError
 		response.Message = err.Error()
@@ -227,12 +229,7 @@ values ($1, $2, $3, now(), now(), now(), $4);`,
 		return
 	}
 
-	if rtn.RowsAffected() < 1 {
-		response.Code = http.StatusInternalServerError
-		response.Message = err.Error()
-		c.JSON(http.StatusOK, &response)
-		return
-	}
+	response.Payload = id
 
 	c.JSON(http.StatusOK, &response)
 }

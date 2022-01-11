@@ -53,10 +53,10 @@ type Letter struct {
 }
 
 type LetterFilter struct {
-	Name               string `json:"name"`
-	Sender             string `json:"sender"`
-	RowsLimit          uint   `json:"rows_limit" validate:"required,number,min=1"`
-	RowsOffset         uint   `json:"rows_offset"`
+	Name       string `json:"name"`
+	Sender     string `json:"sender"`
+	RowsLimit  uint   `json:"rows_limit" validate:"required,number,min=1"`
+	RowsOffset uint   `json:"rows_offset"`
 }
 
 type DescribedLetter struct {
@@ -77,6 +77,7 @@ type Agreement struct {
 	Letter       Letter     `json:"letter,omitempty"`
 	Viewed       bool       `json:"viewed,omitempty"`
 	AgreedAt     time.Time  `json:"agreed_at,omitempty"`
+	Agreed       bool       `json:"agreed,omitempty"`
 }
 
 type Response struct {

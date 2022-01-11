@@ -1,16 +1,27 @@
 package main
 
 import (
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"log"
 	"sed/db"
 	"sed/handlers"
+	"time"
 )
 
 func main() {
 	handlers.Validate = validator.New()
 	r := gin.Default()
+
+	r.Use(cors.New(cors.Config{
+		AllowMethods:     []string{"*"},
+		AllowHeaders:     []string{"*"},
+		AllowCredentials: true,
+		AllowAllOrigins:  true,
+		ExposeHeaders:    []string{"Content-Type"},
+		MaxAge:           12 * time.Hour,
+	}))
 
 	err := db.Connect()
 	if err != nil {
@@ -54,6 +65,8 @@ func main() {
 	r.POST("/letters/agreement", handlers.Authorization, handlers.CreateAgreement)
 
 	r.POST("/letters/agreement/:id", handlers.Authorization, handlers.GetAgreement)
+
+	r.POST("/letters/agreement/:id/:agree", handlers.Authorization, handlers.AgreeAgreement)
 
 	log.Fatalln(r.Run())
 }

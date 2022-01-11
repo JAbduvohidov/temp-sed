@@ -27,12 +27,14 @@ func GetAgreements(c *gin.Context) {
 
 	rows, err := db.Pool.Query(
 		c,
-		`select a.id, l.id, d.id, l.name, l.entry_date, a.viewed, coalesce(a.agreed_at, now())
+		`select a.id, l.id, d.id, d.name, l.name, l.entry_date, a.viewed, a.agreed, coalesce(a.agreed_at, now())
 from agreements a
          left join letters l on a.letter_id = l.id
+         left join employees e on a.department_id = e.department_id
          left join departments d on a.department_id = d.id
-         left join described_letters dl on d.id = dl.department_id and dl.letter_id = l.id
-where dl.executive_employee = $1
+         left join role_group rg on e.role_id = rg.id
+where rg.role in ('ADMIN', 'DEP_HEAD')
+  and e.id = $1
 order by a.id desc;`,
 		userId,
 	)
@@ -49,10 +51,12 @@ order by a.id desc;`,
 		err = rows.Scan(
 			&agreement.Id,
 			&agreement.Letter.Id,
-			&agreement.DepartmentId,
+			&agreement.Department.Id,
+			&agreement.Department.Name,
 			&agreement.Letter.Name,
 			&agreement.Letter.EntryDate,
 			&agreement.Viewed,
+			&agreement.Agreed,
 			&agreement.AgreedAt,
 		)
 		if err != nil {
@@ -159,10 +163,12 @@ where id = $1;`,
 		`select a.id,
        l.id,
        d.id,
+       d.name,
        l.name,
        l.entry_date,
        a.viewed,
-       a.agreed_at
+       a.agreed_at,
+       a.agreed
 from agreements a
          left join letters l on a.letter_id = l.id
          left join departments d on a.department_id = d.id
@@ -172,11 +178,13 @@ where a.id = $1;`,
 	).Scan(
 		&agreement.Id,
 		&agreement.Letter.Id,
-		&agreement.DepartmentId,
+		&agreement.Department.Id,
+		&agreement.Department.Name,
 		&agreement.Letter.Name,
 		&agreement.Letter.EntryDate,
 		&agreement.Viewed,
 		&agreement.AgreedAt,
+		&agreement.Agreed,
 	)
 	if err != nil {
 		response.Code = http.StatusInternalServerError
@@ -186,6 +194,43 @@ where a.id = $1;`,
 	}
 
 	response.Payload = agreement
+
+	c.JSON(http.StatusOK, &response)
+}
+
+func AgreeAgreement(c *gin.Context) {
+	var (
+		response = models.Response{
+			Code:    http.StatusOK,
+			Message: http.StatusText(http.StatusOK),
+			Time:    time.Now(),
+		}
+	)
+
+	id, _ := strconv.Atoi(c.Param("id"))
+	agree, _ := strconv.ParseBool(c.Param("agree"))
+
+	rtn, err := db.Pool.Exec(
+		c,
+		`update agreements
+set agreed = $1
+where id = $2;`,
+		agree,
+		id,
+	)
+	if err != nil {
+		response.Code = http.StatusInternalServerError
+		response.Message = err.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
+
+	if rtn.RowsAffected() < 1 {
+		response.Code = http.StatusInternalServerError
+		response.Message = pgx.ErrNoRows.Error()
+		c.JSON(http.StatusOK, &response)
+		return
+	}
 
 	c.JSON(http.StatusOK, &response)
 }
